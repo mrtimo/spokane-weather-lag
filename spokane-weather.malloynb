@@ -1,0 +1,81 @@
+>>>malloy
+source: GEGweather is duckdb.table('./spokane-temp-1.csv') extend {
+    --rename: day1 is `day`
+    measure: 
+    snow_days is count() {where: Snowfall > 0.01}
+    total_snow_and_precip is sum(Snowfall) + sum(Precipitation)
+    total_snowfall is sum(Snowfall)
+    total_precip is sum(Precipitation)
+    highTemp is sum(MaxTemperature)
+}
+>>>malloy
+# bar_chart
+run: GEGweather -> {
+    group_by: day1.year
+    aggregate: total_snow_and_precip
+    limit: 10000000
+
+        # tooltip bar_chart.size=xs
+        nest: `By Month` is {
+          group_by: day1.month
+          aggregate: total_snow_and_precip
+        }
+
+        # tooltip
+        nest: `Rainiest Months` is {
+          group_by: day1.month
+          aggregate: total_snowfall, total_precip
+          # hidden
+          aggregate: total_snow_and_precip
+          order_by: total_snow_and_precip desc
+          limit: 3
+        }
+}
+>>>malloy
+
+run: GEGweather -> {
+  group_by: day_year is day1.day
+  where: day1.year = @2024
+  aggregate: highTemp
+  calculate:
+  prior_day_temp is lag(highTemp, 1)
+  tempJump is (highTemp - lag(highTemp, 1)) 
+  moving_avg_temp is avg_moving(highTemp, 5)
+  order_by: day_year asc
+  limit: 366
+}
+>>>malloy
+
+run: GEGweather -> {
+  group_by: day_year is day1.day
+  where: day1.year = @2024
+  aggregate: highTemp
+  calculate:
+  prior_day_temp is lag(highTemp, 1)
+  tempJump is (highTemp - lag(highTemp, 1)) 
+  moving_avg_temp is avg_moving(highTemp, 5)
+  order_by: day_year asc
+  limit: 366
+} -> {
+    group_by: day_year, tempJump
+    where: abs(tempJump) > 15
+}
+>>>malloy
+# bar_chart
+run: GEGweather -> {
+  group_by: day_year is day1.day
+  where: day1.year = @2024
+  aggregate: highTemp
+  calculate:
+  prior_day_temp is lag(highTemp, 1)
+  tempJump is (highTemp - lag(highTemp, 1)) 
+  moving_avg_temp is avg_moving(highTemp, 5)
+  order_by: day_year asc
+  --limit: 366
+} -> {
+    group_by: day_year
+    aggregate: avg_temp is moving_avg_temp.sum()
+    --limit: 366
+    --where: abs(tempJump) > 15
+}
+>>>malloy
